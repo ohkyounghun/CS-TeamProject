@@ -54,17 +54,120 @@ direct-mapped 캐시와의 차이를 실제 예시를 통해 검증한다.
 
 ---
 
-## 🧩 구현 구조 (클래스 전개도 + 담당자 매핑)
+## 5. 구현 구조 (클래스 전개도 + 담당자 매핑)
 
-### 1) 클래스 전개도 (Architecture)
-Main
-├─ TraceLoader            // access trace 로딩/생성
-└─ MemorySystem           // 전체 계층 오케스트레이션(흐름 제어)
-├─ L1Cache             // L1 direct-mapped (1)
-├─ L2Cache             // L2 direct-mapped (16)
-├─ L3Cache2Way         // L3 2-way set associative (256, LRU)
-├─ L4Cache             // L4 direct-mapped (4096)
-└─ Stats               // hit/miss 카운터, ratio 계산/출력
+## 🧩 클래스 다이어그램 (텍스트 기반)
+
+[Main]
+- 역할: 프로그램 시작점
+- 책임:
+  - access trace 로딩
+  - MemorySystem 생성 및 실행
+- 사용 클래스:
+  - TraceLoader
+  - MemorySystem
+  - Stats
+
+--------------------------------------------------
+
+[TraceLoader]
+- 역할: 실세계 데이터 접근 패턴 생성/로딩
+- 책임:
+  - accessTrace(int[]) 생성
+  - 파일 기반 trace 로딩
+- 제공 메서드:
+  - int[] loadTrace(String path)
+  - int[] generateTrace()
+
+--------------------------------------------------
+
+[MemorySystem]
+- 역할: 메모리 계층 접근 흐름 제어
+- 책임:
+  - L1 → L2 → L3 → L4 순차 접근
+  - 상위 캐시 hit 시 하위 접근 중단
+- 포함 객체:
+  - L1Cache
+  - L2Cache
+  - L3Cache2Way
+  - L4Cache
+  - Stats
+- 제공 메서드:
+  - void access(int address)
+  - void runSimulation(int[] trace)
+
+--------------------------------------------------
+
+[L1Cache]
+- 역할: 최상위 캐시 (Direct-mapped)
+- 크기: 1 element
+- 책임:
+  - tag / valid / data 배열 관리
+  - hit / miss 판단
+- 제공 메서드:
+  - boolean access(int address)
+- 담당자:
+  - 역할 A
+
+--------------------------------------------------
+
+[L2Cache]
+- 역할: 상위 캐시 (Direct-mapped)
+- 크기: 16 elements
+- 책임:
+  - index / tag 계산
+  - hit / miss 처리
+- 제공 메서드:
+  - boolean access(int address)
+- 담당자:
+  - 역할 A
+
+--------------------------------------------------
+
+[L3Cache2Way]
+- 역할: 중간 캐시 (2-way Set Associative)
+- 크기: 256 elements
+- 구조:
+  - valid[set][2]
+  - tag[set][2]
+  - data[set][2]
+  - lru[set]
+- 교체 정책:
+  - LRU (Least Recently Used)
+- 책임:
+  - set / way 탐색
+  - eviction 처리
+- 제공 메서드:
+  - boolean access(int address)
+- 담당자:
+  - 역할 B
+
+--------------------------------------------------
+
+[L4Cache]
+- 역할: 최하위 캐시 (메인 메모리 역할)
+- 크기: 4096 elements
+- 책임:
+  - miss 시 데이터 저장
+- 제공 메서드:
+  - boolean access(int address)
+- 담당자:
+  - 역할 C
+
+--------------------------------------------------
+
+[Stats]
+- 역할: 통계 및 결과 관리
+- 책임:
+  - 계층별 hit / miss 카운트
+  - hit ratio 계산
+- 제공 메서드:
+  - void recordHit(int level)
+  - void recordMiss(int level)
+  - void printResult()
+- 담당자:
+  - 역할 C
+
 
 > 원칙: 각 캐시 계층은 **독립 클래스**, 내부 자료구조는 **배열만 사용**  
 > MemorySystem은 “L1→L2→L3→L4” 접근 흐름만 책임짐
