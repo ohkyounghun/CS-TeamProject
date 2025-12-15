@@ -1,0 +1,89 @@
+⸻
+
+✅ 4-Layer Memory Hierarchy Simulation — 최소 합의안 v1.0 (팀 공유용)
+
+0) 기본 전제
+	•	address는 0 이상의 정수.
+	•	원본 데이터는 크기 N > 4096인 배열 DATA[]에 존재한다고 가정.
+	•	L1/L2/L3/L4는 모두 배열로만 구현한다.
+
+⸻
+
+1) 계층 구조 및 크기
+	•	L1: 1 element, direct-mapped
+	•	L2: 16 elements, direct-mapped
+	•	L3: 256 elements, 2-way set associative (E=2), LRU
+	•	L4: 4096 elements, direct-mapped (main memory buffer 역할)
+
+(주의) “원본 DATA”는 L4 바깥에 존재하고, L4는 그중 일부(4096)만 유지하는 구조로 설명한다.
+
+⸻
+
+2) 주소 매핑 규칙 (통일)
+
+A) Direct-mapped (L1/L2/L4 공통)
+	•	index = address % SIZE
+	•	tag   = address / SIZE
+	•	hit 조건: valid[index] == true && tag[index] == tag
+
+B) L3 2-way set associative
+	•	E = 2
+	•	NUM_SETS = 256 / 2 = 128
+	•	setIndex = address % NUM_SETS  (즉 % 128)
+	•	tag      = address / NUM_SETS  (즉 / 128)
+	•	hit 조건: 해당 set의 2개 way 중
+valid[set][way] && tag[set][way] == tag 인 라인이 있으면 hit
+
+⸻
+
+3) Block size 가정
+	•	단순화를 위해 block size(B) = 1 element로 가정 (offset 없음)
+
+⸻
+
+4) 접근 흐름(필수) + 프로모션 정책(inclusive)
+
+MemorySystem.access(address) 동작은 아래를 따른다.
+	1.	L1 접근
+	•	hit면 종료
+	2.	L1 miss → L2 접근
+	•	L2 hit면: L1.insert(address) 후 종료
+	3.	L2 miss → L3 접근
+	•	L3 hit면: L2.insert(address), L1.insert(address) 후 종료
+	4.	L3 miss → L4 접근(또는 DATA에서 가져와 L4에 적재)
+	•	L4에서 가져온 뒤: L3.insert(address), L2.insert(address), L1.insert(address)
+
+요약: 하위에서 찾거나 로딩하면 “요청 address”는 위로 올린다(inclusive).
+
+⸻
+
+5) 교체 정책
+	•	L1/L2/L4 (direct-mapped): 해당 index에 그냥 덮어쓰기
+	•	L3 (2-way):
+	•	빈 way 있으면 거기 적재
+	•	둘 다 차있으면 LRU 방식으로 victim 선택 후 교체
+
+LRU 구현 최소 규칙:
+	•	lru[set]는 “최근에 덜 사용된 way” 또는 “다음에 쫓아낼 way”를 나타내는 0/1 값으로 관리
+	•	hit 발생 시: 해당 way가 MRU가 되도록 lru[set] 갱신
+	•	miss로 교체 시: lru[set]가 가리키는 way를 교체하고, 교체 후 lru[set] 반대값으로 갱신
+
+⸻
+
+6) Stats(카운팅) 규칙 — ‘접근한 레벨만’ 기록
+	•	한 번의 access에서 실제로 검사한 레벨에 대해서만 hit/miss를 기록한다.
+	•	예시:
+	•	L1 hit → L1 hit 1
+	•	L1 miss, L2 hit → L1 miss 1 + L2 hit 1
+	•	L1 miss, L2 miss, L3 hit → L1 miss 1 + L2 miss 1 + L3 hit 1
+	•	전부 miss → L1 miss + L2 miss + L3 miss + (L4 miss or L4 access/load 1)
+
+⸻
+
+7) 공통 인터페이스(통합 규격)
+
+각 캐시 클래스는 아래 메서드를 제공한다.
+
+boolean access(int address); // hit이면 true, miss이면 false
+void insert(int address);    // address 적재(교체 포함)
+
