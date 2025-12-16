@@ -1,0 +1,18 @@
+$N = 50000
+$L = 20000
+$rand = New-Object System.Random(42)
+
+"" | Out-File -Encoding ascii data\accessTrace.txt
+
+for ($i=0; $i -lt $L; $i++) {
+    $r = $rand.NextDouble()
+    if ($r -lt 0.70) {
+        $addr = $rand.Next(0, 200)
+    } elseif ($r -lt 0.90) {
+        $addr = 200 + $rand.Next(0, 1800)
+    } else {
+        $addr = 2000 + $rand.Next(0, $N - 2000)
+    }
+    $addr | Out-File -Append -Encoding ascii data\accessTrace.txt
+}
+// 터미널에서 이 코드 실행시 accessTrace에 숫자들 생성됨. 
